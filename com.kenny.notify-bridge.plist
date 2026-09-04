@@ -7,12 +7,12 @@
   runs as root before login and, Full Disk Access or not, would be
   reading the wrong account's notifications.
 
-  Before this works, the *python binary* needs Full Disk Access -- not
+  Before this works, the *python binary* needs Full Disk Access — not
   Terminal, which is what you granted to run it by hand. launchd starts
   python directly, so that is what macOS checks.
 
     System Settings -> Privacy & Security -> Full Disk Access -> +
-    then add the interpreter printed by:  ./notify-bridge.py --check
+    then add the interpreter printed by:  ./notify-bridge.py —check
 
   Install:
     # put your topic in the file first, replacing CHANGE-ME
@@ -36,8 +36,11 @@
         <string>REPLACE-WITH-ABSOLUTE-PATH/notify-bridge.py</string>
         <string>--topic</string>
         <string>CHANGE-ME-run-openssl-rand-hex-12</string>
-        <!-- Point at a ntfy on this Mac to keep everything on the LAN:
-             <string>- -server</string><string>http://127.0.0.1:2586</string> -->
+        <!-- To keep everything on the LAN, run a ntfy server on this Mac and
+             add two more <string> entries above: the flag "server" prefixed
+             with two hyphens, then the URL, e.g. http://127.0.0.1:2586
+             (written out because a literal double hyphen cannot appear
+             inside an XML comment). -->
     </array>
 
     <key>RunAtLoad</key>
