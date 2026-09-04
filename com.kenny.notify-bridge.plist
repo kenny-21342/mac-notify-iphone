@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Run the notification bridge in the background, at login.
+
+  A LaunchAgent, not a LaunchDaemon: the notification database lives in
+  your home directory and the process must be you to read it. A daemon
+  runs as root before login and, Full Disk Access or not, would be
+  reading the wrong account's notifications.
+
+  Before this works, the *python binary* needs Full Disk Access -- not
+  Terminal, which is what you granted to run it by hand. launchd starts
+  python directly, so that is what macOS checks.
+
+    System Settings -> Privacy & Security -> Full Disk Access -> +
+    then add the interpreter printed by:  ./notify-bridge.py --check
+
+  Install:
+    # put your topic in the file first, replacing CHANGE-ME
+    cp com.kenny.notify-bridge.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kenny.notify-bridge.plist
+
+  Stop:
+    launchctl bootout gui/$(id -u)/com.kenny.notify-bridge
+
+  Logs:
+    tail -f ~/mac-notify-iphone/bridge.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.kenny.notify-bridge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>REPLACE-WITH-ABSOLUTE-PATH/notify-bridge.py</string>
+        <string>--topic</string>
+        <string>CHANGE-ME-run-openssl-rand-hex-12</string>
+        <!-- Point at a ntfy on this Mac to keep everything on the LAN:
+             <string>- -server</string><string>http://127.0.0.1:2586</string> -->
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>REPLACE-WITH-ABSOLUTE-PATH/bridge.log</string>
+    <key>StandardErrorPath</key>
+    <string>REPLACE-WITH-ABSOLUTE-PATH/bridge.log</string>
+</dict>
+</plist>
