@@ -40,6 +40,7 @@ import json
 import os
 import plistlib
 import sqlite3
+import ssl
 import sys
 import time
 import urllib.error
@@ -150,9 +151,9 @@ def fetch_since(con: sqlite3.Connection, after: int) -> list[dict]:
 def push(server: str, topic: str, item: dict, timeout: float) -> bool:
     """Send one notification. Returns whether it landed."""
     # ntfy takes the body as the request body and the rest as headers.
-    # Headers must be latin-1 encodable, and a notification title is
-    # routinely not -- an em dash or a Chinese app name is enough -- so
-    # the title goes out RFC 2047 encoded, which ntfy decodes.
+    # The body is UTF-8 and says so; the title is a header and cannot be,
+    # so anything past ASCII goes out RFC 2047 encoded for ntfy to decode.
+    # An em dash, a Chinese app name or the `·` below is enough.
     title = " · ".join(p for p in (item["app"], item["title"]) if p)
     text = "\n".join(p for p in (item["subtitle"], item["body"]) if p) or title
 
@@ -169,20 +170,39 @@ def push(server: str, topic: str, item: dict, timeout: float) -> bool:
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return 200 <= response.status < 300
-    except (urllib.error.URLError, TimeoutError, OSError) as err:
+    except urllib.error.URLError as err:
+        # A python.org build ships with no CA bundle until you run its
+        # Install Certificates.command, so every HTTPS post fails here
+        # while curl on the same Mac is fine. Worth naming, because the
+        # error urllib raises does not suggest that is what happened.
+        if isinstance(err.reason, ssl.SSLCertVerificationError):
+            print(f"  ! delivery failed: {sys.executable} has no CA"
+                  f" certificates, so it cannot verify {server}.", file=sys.stderr)
+            print("    Run that python's Install Certificates.command, or run"
+                  " this under /usr/bin/python3.", file=sys.stderr)
+        else:
+            print(f"  ! delivery failed: {err}", file=sys.stderr)
+        return False
+    except (TimeoutError, OSError) as err:
         print(f"  ! delivery failed: {err}", file=sys.stderr)
         return False
 
 
 def encode_header(value: str) -> str:
-    """RFC 2047 for anything a latin-1 header cannot carry."""
-    try:
-        value.encode("latin-1")
-        return value
-    except UnicodeEncodeError:
-        from base64 import b64encode
+    """RFC 2047 for anything that is not plain ASCII.
 
-        return "=?UTF-8?B?" + b64encode(value.encode("utf-8")).decode("ascii") + "?="
+    The test is ASCII rather than latin-1 even though urllib will happily
+    put latin-1 in a header: ntfy reads the bytes back as UTF-8, so a
+    character like `·` or `é` survives urllib and arrives mangled. The
+    separator this module builds titles with is `·`, so that is every
+    notification, not an edge case.
+    """
+    if value.isascii():
+        return value
+
+    from base64 import b64encode
+
+    return "=?UTF-8?B?" + b64encode(value.encode("utf-8")).decode("ascii") + "?="
 
 
 def main() -> int:
